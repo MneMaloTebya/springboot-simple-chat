@@ -1,18 +1,26 @@
 package com.github.mnemalotebya.spingbootsimplechat.controller;
 
+import com.github.mnemalotebya.spingbootsimplechat.dto.DtoMessage;
+import com.github.mnemalotebya.spingbootsimplechat.dto.MessageMapper;
 import com.github.mnemalotebya.spingbootsimplechat.model.MessageRepository;
 import com.github.mnemalotebya.spingbootsimplechat.model.UserRepository;
 import com.github.mnemalotebya.spingbootsimplechat.model.entity.Message;
 import com.github.mnemalotebya.spingbootsimplechat.model.entity.User;
 import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.Sort;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.request.RequestContextHolder;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 public class ChatController {
@@ -26,19 +34,16 @@ public class ChatController {
     @GetMapping("/init")
     public HashMap<String, Boolean> init() {
         HashMap<String, Boolean> response = new HashMap<>();
+        Map<String, Boolean> result = new HashMap<>();
         String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
-        Optional<User> optional = userRepository.findBySessionId(sessionId);
-        response.put("result", optional.isPresent());
+        Optional<User> userOpt = userRepository.findBySessionId(sessionId);
+        response.put("result", userOpt.isPresent());
         return response;
     }
 
     @PostMapping("/auth")
     public HashMap<String, Boolean> auth(@RequestParam String name) {
         HashMap<String, Boolean> response = new HashMap<>();
-        if (!Strings.isNotEmpty(name)) {
-            response.put("result", false);
-            return response;
-        }
         String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
         User user = new User();
         user.setName(name);
@@ -49,11 +54,9 @@ public class ChatController {
     }
 
     @PostMapping("/message")
-    public HashMap<String, Boolean> sendMessage(@RequestParam String message) {
-        HashMap<String, Boolean> response = new HashMap<>();
-        if (Strings.isEmpty(message)){
-            response.put("result", false);
-            return response;
+    public Map<String, Boolean> sendMessage(@RequestParam String message) {
+        if (Strings.isEmpty(message)) {
+            return Map.of("result", false);
         }
         String sessionId = RequestContextHolder.currentRequestAttributes().getSessionId();
         User user = userRepository.findBySessionId(sessionId).get();
@@ -61,14 +64,17 @@ public class ChatController {
         newMessage.setDateTime(LocalDateTime.now());
         newMessage.setMessage(message);
         newMessage.setUser(user);
-        messageRepository.save(newMessage);
-        response.put("result", true);
-        return response;
+        messageRepository.saveAndFlush(newMessage);
+        return Map.of("result", true);
     }
 
     @GetMapping("/message")
-    public List<String> getMessagesList() {
-        return null;
+    public List<DtoMessage> getMessagesList() {
+        return messageRepository
+                .findAll(Sort.by(Sort.Direction.ASC, "dateTime"))
+                .stream()
+                .map(message -> MessageMapper.map(message))
+                .collect(Collectors.toList());
     }
 
     @GetMapping("/user")
