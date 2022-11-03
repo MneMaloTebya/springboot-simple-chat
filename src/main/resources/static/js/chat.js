@@ -2,6 +2,16 @@ $(function () {
     let initApplication = function () {
         $('.messages-and-users').css({display: 'flex'});
         $('.controls').css({display: 'flex'});
+        $('.send-message').on('click', function (){
+            let message = $('.new-message').val();
+            $.post('/message', {message: message}, function (response){
+                if (response.result) {
+                    $('.new-message').val('');
+                } else {
+                    alert('Ошибка. Повторите попытку.')
+                }
+            })
+        });
     };
 
     let registerUser = function (name) {
